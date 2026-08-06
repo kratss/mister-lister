@@ -8,7 +8,7 @@
 #include <map>
 #include <stdexcept>
 #include <string>
-
+ 
 using namespace ftxui;
 using namespace std;
 
@@ -26,6 +26,14 @@ enum class Action {
   quit,
   remove,
   search,
+};
+
+struct State {
+  vector<vector<string>> data;
+  int max_col = 0;
+  Mode mode = Mode::Normal;
+  int sel_row = 0;
+  int sel_col = 0;
 };
 
 vector<vector<string>> readData(const filesystem::path &path,
@@ -73,9 +81,14 @@ vector<vector<string>> normalizeRows(const vector<vector<string>> &data,
   return normalized_data;
 }
 
-void columnAdd(const vector<vector<string>> &data, const int &max_col){
-    normalizeRows(data, max_col+1);
-    
+State columnAdd(const State &state) {
+  State new_state = state;
+  new_state.max_col = state.max_col+1;
+  new_state.data = normalizeRows(state.data, new_state.max_col);
+  new_state.sel_col = new_state.max_col;
+  new_state.sel_row = 0;
+  new_state.mode = Mode::Edit;
+  return new_state;
 }
 
 int main() {
@@ -99,13 +112,15 @@ int main() {
   InputOption input_options;
   input_options.placeholder = &input_placeholder;
 
+  State state = {data,max_col};
+
   std::string input_buffer;
   Component input = Input(&input_buffer, input_options);
 
   Component table_component = Renderer([&] {
-    Table table = Table(data);
-    table.SelectCell(sel_col, sel_row).Border(LIGHT);
-    table.SelectCell(sel_col, sel_row).DecorateCells(inverted);
+    Table table = Table(state.data);
+    table.SelectCell(state.sel_col, sel_row).Border(LIGHT);
+    table.SelectCell(state.sel_col, sel_row).DecorateCells(inverted);
     table.SelectRow(0).Decorate(bold);
     table.SelectRow(0).Border(DOUBLE);
     table.SelectAll().DecorateCellsAlternateRow(
@@ -119,9 +134,9 @@ int main() {
     });
 
     Element table_element = table.Render();
-    if (mode == Mode::Normal) {
+    if (state.mode == Mode::Normal) {
       return table_element;
-    } else if (mode == Mode::Edit) {
+    } else if (state.mode == Mode::Edit) {
       return vbox({
           hbox({
               text("Edit: "),
@@ -132,7 +147,7 @@ int main() {
           table_element,
 
       });
-    } else if (mode == Mode::Add) {
+    } else if (state.mode == Mode::Add) {
       return vbox({
           hbox({
               text("Add: "),
@@ -187,15 +202,15 @@ int main() {
     const auto binding = key_bindings.find(event);
 
     if (event == Event::Escape) {
-      mode = Mode::Normal;
+      state.mode = Mode::Normal;
       return true;
     }
 
-    switch (mode) {
+    switch (state.mode) {
     case Mode::Edit:
       if (event == Event::Return) {
-        data[sel_row][sel_col] = input_buffer;
-        mode = Mode::Normal;
+        state.data[sel_row][state.sel_col] = input_buffer;
+        state.mode = Mode::Normal;
         break;
         return true;
       } else {
@@ -204,21 +219,21 @@ int main() {
 
     case Mode::Add:
       if (event == Event::Return) {
-        data[sel_row][sel_col] = input_buffer;
-        if (sel_col + 1 < max_col) {
-          sel_col++;
-          input_placeholder = data[0][sel_col]; // header
+        state.data[sel_row][state.sel_col] = input_buffer;
+        if (state.sel_col + 1 < max_col) {
+          state.sel_col++;
+          input_placeholder = state.data[0][state.sel_col]; // header
           input_buffer.erase();
           return true;
         } else {
-          mode = Mode::Normal;
+          state.mode = Mode::Normal;
           return true;
         }
       }
       return input->OnEvent(event);
     }
 
-    if (key_press == key_bindings.end())
+    if (binding == key_bindings.end())
       return false; // Handle undefined events
     switch (binding->second) {
 
@@ -226,61 +241,61 @@ int main() {
       if (sel_row > 0)
         sel_row--;
       else
-        sel_row = data.size() - 1;
+        sel_row = state.data.size() - 1;
       return true;
 
     case Action::move_down:
-      if (sel_row < data.size() - 1)
+      if (sel_row < state.data.size() - 1)
         sel_row++;
       else
         sel_row = 0;
       return true;
 
     case Action::move_left:
-      if (sel_col > 0)
-        sel_col--;
+      if (state.sel_col > 0)
+        state.sel_col--;
       else
-        sel_col = data[sel_row].size() - 1;
+        state.sel_col = state.data[sel_row].size() - 1;
       return true;
 
     case Action::move_right:
-      if (sel_col < data[sel_row].size() - 1)
-        sel_col++;
+      if (state.sel_col < state.data[sel_row].size() - 1)
+        state.sel_col++;
       else
-        sel_col = 0;
+        state.sel_col = 0;
       return true;
 
     case Action::add_entry:
-      mode = Mode::Add;
-      data.push_back(blank_row);
-      sel_row = data.size() - 1;
-      sel_col = 0;
+      state.mode = Mode::Add;
+      state.data.push_back(blank_row);
+      sel_row = state.data.size() - 1;
+      state.sel_col = 0;
       input_buffer.clear();
-      input_placeholder = data[0][sel_col]; // header
+      input_placeholder = state.data[0][state.sel_col]; // header
       return true;
 
     case Action::column_add:
-      mode = Mode::;
+      state = columnAdd(state);
       input_buffer.clear();
       input_placeholder = "New field";
       return true;
 
     case Action::edit:
-      mode = Mode::Edit;
+      state.mode = Mode::Edit;
       input_buffer.clear();
       input_placeholder =
-          data[sel_row][sel_col]; // load current value input->TakeFocus();
+          state.data[sel_row][state.sel_col]; // load current value input->TakeFocus();
       return true;
 
     case Action::quit:
+      writeData(path, delimiter, state.data);
       screen.Exit();
 
     case Action::remove:
-      data.erase(data.begin() + sel_row);
+      state.data.erase(state.data.begin() + sel_row);
     }
     return false;
   });
 
   screen.Loop(table_component);
-  writeData(path, delimiter, data);
 }
