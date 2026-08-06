@@ -85,7 +85,7 @@ State columnAdd(const State &state) {
   State new_state = state;
   new_state.max_col = state.max_col+1;
   new_state.data = normalizeRows(state.data, new_state.max_col);
-  new_state.sel_col = new_state.max_col;
+  new_state.sel_col = new_state.max_col-1; // Fixed off-by-one
   new_state.sel_row = 0;
   new_state.mode = Mode::Edit;
   return new_state;
