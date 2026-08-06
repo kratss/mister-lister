@@ -1,13 +1,14 @@
 #include <filesystem>
-#include <fstream>
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/component_base.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/dom/table.hpp>
+#include <iostream>
 #include <map>
 #include <stdexcept>
 #include <string>
+#include "csv.h"
  
 using namespace ftxui;
 using namespace std;
@@ -28,6 +29,11 @@ enum class Action {
   search,
 };
 
+struct Binding {
+  string keys;
+  Action action;
+};
+
 struct State {
   vector<vector<string>> data;
   int max_col = 0;
@@ -35,51 +41,6 @@ struct State {
   int sel_row = 0;
   int sel_col = 0;
 };
-
-vector<vector<string>> readData(const filesystem::path &path,
-                                const char &delimiter) {
-  ifstream file(path);
-  if (!file) {
-    throw std::runtime_error("Unable to open file");
-  }
-  vector<vector<string>> data;
-  for (string line; getline(file, line);) {
-    vector<string> row;
-    stringstream line_stream(line);
-    for (string field; getline(line_stream, field, delimiter);) {
-      row.push_back(field);
-    }
-    data.push_back(row);
-  }
-  return data;
-}
-
-void writeData(const filesystem::path &path, const char &delimiter,
-               const vector<vector<string>> &data) {
-  ofstream file;
-  file.open(path);
-  string file_string;
-  for (vector<string> row : data) {
-    file_string.append(row[0]);
-    for (int j = 1; j < row.size(); j++) {
-      file_string.push_back(delimiter);
-      file_string.append(row[j]);
-    }
-    file_string.push_back('\n');
-  }
-  file << file_string;
-}
-
-vector<vector<string>> normalizeRows(const vector<vector<string>> &data,
-                                     const int &max_col) {
-  vector<vector<string>> normalized_data = data;
-  for (int i = 0; i < data.size(); i++) {
-    for (int j = data[i].size(); j < max_col; j++) {
-      normalized_data[i].push_back("-");
-    }
-  }
-  return normalized_data;
-}
 
 State columnAdd(const State &state) {
   State new_state = state;
@@ -91,36 +52,10 @@ State columnAdd(const State &state) {
   return new_state;
 }
 
-int main() {
-  char delimiter = ',';
-  filesystem::path path = "/home/m/knowledge/books.csv";
-  vector<vector<string>> raw_data = readData(path, delimiter);
-  int max_col = 0;
-  for (int i = 0; i < raw_data.size(); i++) {
-    if (raw_data[i].size() > max_col)
-      max_col = raw_data[i].size();
-  }
-  vector<vector<string>> data = normalizeRows(raw_data, max_col);
-  vector<string> blank_row;
-  for (int i = 0; i < max_col; i++)
-    blank_row.push_back("-");
-  int sel_row = 0;
-  int sel_col = 0;
-  Mode mode = Mode::Normal;
-  auto screen = ScreenInteractive::Fullscreen();
-  string input_placeholder = "PLACHOLDER";
-  InputOption input_options;
-  input_options.placeholder = &input_placeholder;
-
-  State state = {data,max_col};
-
-  std::string input_buffer;
-  Component input = Input(&input_buffer, input_options);
-
-  Component table_component = Renderer([&] {
+Table designTable(const State &state) {
     Table table = Table(state.data);
-    table.SelectCell(state.sel_col, sel_row).Border(LIGHT);
-    table.SelectCell(state.sel_col, sel_row).DecorateCells(inverted);
+    table.SelectCell(state.sel_col, state.sel_row).Border(LIGHT);
+    table.SelectCell(state.sel_col, state.sel_row).DecorateCells(inverted);
     table.SelectRow(0).Decorate(bold);
     table.SelectRow(0).Border(DOUBLE);
     table.SelectAll().DecorateCellsAlternateRow(
@@ -132,34 +67,70 @@ int main() {
           text(" "),
       });
     });
+    return table;
+}
 
+int main(int argc, char** argv) {
+  if (argc != 2) {
+    std::cerr << "Usage: " << (argc > 0 ? argv[0] : "mister-lister")
+              << " <file.csv>\n";
+    return 1;
+  }
+
+  char delimiter = '—';
+  filesystem::path path = argv[1];
+  vector<vector<string>> raw_data = readData(path, delimiter);
+  int max_col = 0;
+  for (int i = 0; i < raw_data.size(); i++) {
+    if (raw_data[i].size() > max_col)
+      max_col = raw_data[i].size();
+  }
+  vector<vector<string>> data = normalizeRows(raw_data, max_col);
+  State state = {data,max_col};
+  vector<string> blank_row;
+  for (int i = 0; i < state.max_col; i++)
+    blank_row.push_back("-");
+  auto screen = ScreenInteractive::Fullscreen();
+
+  string input_placeholder = "PLACHOLDER";
+  InputOption input_options;
+  input_options.placeholder = &input_placeholder;
+  std::string input_buffer;
+  Component input = Input(&input_buffer, input_options);
+
+  Component table_component = Renderer([&] {
+    Table table = designTable(state);
     Element table_element = table.Render();
-    if (state.mode == Mode::Normal) {
-      return table_element;
-    } else if (state.mode == Mode::Edit) {
-      return vbox({
-          hbox({
+    return table_element;
+  });
+                                    
+  // TODO Rewrite the comp -> element -> comp redundancy when FTXUI > 7.0 available
+  Component edit_component = Renderer([&] {
+          Element edit_element = hbox({
               text("Edit: "),
               input->Render() | flex,
               text("  Enter: save  Esc: cancel"),
-          }),
-          separator(),
-          table_element,
+          });
+          return edit_element;
+    });
 
-      });
-    } else if (state.mode == Mode::Add) {
-      return vbox({
-          hbox({
+  Component add_component = Renderer([&] {
+          return hbox({
               text("Add: "),
               input->Render() | flex,
               text("  Enter: save  Esc: cancel"),
-          }),
-          separator(),
-          table_element,
-
-      });
-    }
+              });
   });
+
+
+  Component footer_component = Renderer([] { return text("a: Add entry, e: Edit cell, c: Create new column, d: Delete row, q: quit"); });
+
+  Component final_component = Container::Vertical({
+                                                    edit_component | Maybe([&] {return state.mode==Mode::Edit;}),
+                                                    add_component | Maybe([&] {return state.mode==Mode::Add;}),
+                                                    table_component | flex,
+                                                    footer_component
+                                                  });
 
   map<Event, Action> key_bindings = {{Event::ArrowUp, Action::move_up},
                                      {Event::ArrowDown, Action::move_down},
@@ -176,10 +147,7 @@ int main() {
                                      {Event::c, Action::column_add},
                                      {Event::Character('/'), Action::search}};
 
-  struct Binding {
-    string keys;
-    Action action;
-  };
+  //TODO support two character commands
   const vector<Binding> key_bindings_two = {
       {"k", Action::move_up},
       {"j", Action::move_down},
@@ -198,7 +166,7 @@ int main() {
   };
 
   // Catch keyboard input
-  table_component = CatchEvent(table_component, [&](Event event) {
+  final_component = CatchEvent(final_component, [&](Event event) {
     const auto binding = key_bindings.find(event);
 
     if (event == Event::Escape) {
@@ -209,18 +177,17 @@ int main() {
     switch (state.mode) {
     case Mode::Edit:
       if (event == Event::Return) {
-        state.data[sel_row][state.sel_col] = input_buffer;
+        state.data[state.sel_row][state.sel_col] = input_buffer;
         state.mode = Mode::Normal;
         break;
-        return true;
       } else {
         return input->OnEvent(event);
       }
 
     case Mode::Add:
       if (event == Event::Return) {
-        state.data[sel_row][state.sel_col] = input_buffer;
-        if (state.sel_col + 1 < max_col) {
+        state.data[state.sel_row][state.sel_col] = input_buffer;
+        if (state.sel_col + 1 < state.max_col) {
           state.sel_col++;
           input_placeholder = state.data[0][state.sel_col]; // header
           input_buffer.erase();
@@ -238,28 +205,28 @@ int main() {
     switch (binding->second) {
 
     case Action::move_up:
-      if (sel_row > 0)
-        sel_row--;
+      if (state.sel_row > 0)
+        state.sel_row--;
       else
-        sel_row = state.data.size() - 1;
+        state.sel_row = state.data.size() - 1;
       return true;
 
     case Action::move_down:
-      if (sel_row < state.data.size() - 1)
-        sel_row++;
+      if (state.sel_row < state.data.size() - 1)
+        state.sel_row++;
       else
-        sel_row = 0;
+        state.sel_row = 0;
       return true;
 
     case Action::move_left:
       if (state.sel_col > 0)
         state.sel_col--;
       else
-        state.sel_col = state.data[sel_row].size() - 1;
+        state.sel_col = state.data[state.sel_row].size() - 1;
       return true;
 
     case Action::move_right:
-      if (state.sel_col < state.data[sel_row].size() - 1)
+      if (state.sel_col < state.data[state.sel_row].size() - 1)
         state.sel_col++;
       else
         state.sel_col = 0;
@@ -268,7 +235,7 @@ int main() {
     case Action::add_entry:
       state.mode = Mode::Add;
       state.data.push_back(blank_row);
-      sel_row = state.data.size() - 1;
+      state.sel_row = state.data.size() - 1;
       state.sel_col = 0;
       input_buffer.clear();
       input_placeholder = state.data[0][state.sel_col]; // header
@@ -284,7 +251,7 @@ int main() {
       state.mode = Mode::Edit;
       input_buffer.clear();
       input_placeholder =
-          state.data[sel_row][state.sel_col]; // load current value input->TakeFocus();
+          state.data[state.sel_row][state.sel_col]; // load current value input->TakeFocus();
       return true;
 
     case Action::quit:
@@ -292,10 +259,10 @@ int main() {
       screen.Exit();
 
     case Action::remove:
-      state.data.erase(state.data.begin() + sel_row);
+      state.data.erase(state.data.begin() + state.sel_row);
     }
     return false;
   });
 
-  screen.Loop(table_component);
+  screen.Loop(final_component);
 }
