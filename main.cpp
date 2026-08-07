@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  char delimiter = '—';
+  char delimiter = '\x1F';
   filesystem::path path = argv[1];
   vector<vector<string>> raw_data = readData(path, delimiter);
   int max_col = 0;
