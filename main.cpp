@@ -61,6 +61,15 @@ State columnAdd(const State &state) {
   return new_state;
 }
 
+State column_delete(const State &state) {
+  State new_state = state;
+  new_state.max_col = state.max_col - 1;
+  for (int i = 0; i < state.data.size(); i++) {
+    new_state.data[i].erase(new_state.data[i].begin() + state.sel_col);
+  }
+  return new_state;
+}
+
 Table designTable(const State &state) {
   Table table = Table(state.data);
   table.SelectCell(state.sel_col, state.sel_row).Border(LIGHT);
@@ -133,8 +142,8 @@ int main(int argc, char **argv) {
   });
 
   Component footer_component = Renderer([] {
-    return text("a: Add entry, e: Edit cell, c: Create new column, d: Delete "
-                "row, q: quit");
+    return text("a: add entry, e: edit cell, c: create new column, d: delete "
+                "row, q: quit, u: undo");
   });
 
   Component final_component = Container::Vertical(
@@ -152,6 +161,7 @@ int main(int argc, char **argv) {
                                      {Event::l, Action::move_right},
                                      {Event::a, Action::add_entry},
                                      {Event::c, Action::column_add},
+                                     {Event::C, Action::column_delete},
                                      {Event::e, Action::edit},
                                      {Event::d, Action::remove},
                                      {Event::q, Action::quit},
@@ -258,7 +268,17 @@ int main(int argc, char **argv) {
       return true;
 
     case Action::column_add:
+      state.data_history.push_back(state.data);
+      state.undo_pos++;
       state = columnAdd(state);
+      input_buffer.clear();
+      input_placeholder = "New field";
+      return true;
+
+    case Action::column_delete:
+      state.data_history.push_back(state.data);
+      state.undo_pos++;
+      state = column_delete(state);
       input_buffer.clear();
       input_placeholder = "New field";
       return true;
@@ -285,13 +305,13 @@ int main(int argc, char **argv) {
       screen.Exit();
 
     case Action::undo:
-      if (state.undo_pos > 0){
+      if (state.undo_pos > 0) {
         state.undo_pos--;
         state.data = state.data_history[state.undo_pos];
         state.data_history.erase(state.data_history.begin() + state.undo_pos,
                                  state.data_history.end());
-         return true;
-         }
+        return true;
+      }
     }
     return false;
   });
