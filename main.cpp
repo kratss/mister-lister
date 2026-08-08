@@ -14,7 +14,7 @@
 using namespace ftxui;
 using namespace std;
 
-const map<string, Action> key_bindings_two = {
+const map<string, Action> key_bindings = {
     {"k", Action::move_up},
     {"j", Action::move_down},
     {"h", Action::move_left},
@@ -25,10 +25,12 @@ const map<string, Action> key_bindings_two = {
     {"a", Action::add_entry},
     {"d", Action::remove},
     {"e", Action::edit},
-    {"q", Action::quit},
+    {"wq", Action::quit},
+    {"r", Action::edit},
     {"u", Action::undo},
     {"/", Action::search},
 
+    {"q!", Action::quit_without_saving},
     {"ca", Action::column_add},
     {"cd", Action::column_delete},
 };
@@ -121,24 +123,6 @@ int main(int argc, char **argv) {
        }),
        table_component | flex});
 
-  map<Event, Action> key_bindings = {{Event::ArrowUp, Action::move_up},
-                                     {Event::ArrowDown, Action::move_down},
-                                     {Event::ArrowLeft, Action::move_left},
-                                     {Event::ArrowRight, Action::move_right},
-                                     {Event::k, Action::move_up},
-                                     {Event::j, Action::move_down},
-                                     {Event::h, Action::move_left},
-                                     {Event::l, Action::move_right},
-                                     {Event::a, Action::add_entry},
-                                     {Event::c, Action::column_add},
-                                     {Event::C, Action::column_delete},
-                                     {Event::e, Action::edit},
-                                     {Event::d, Action::remove},
-                                     {Event::q, Action::quit},
-                                     {Event::Q, Action::quit_without_saving},
-                                     {Event::u, Action::undo},
-                                     {Event::Character('/'), Action::search}};
-
   // Catch keyboard input
   final_component = CatchEvent(final_component, [&](Event event) {
     // state.data[0][3] = event.character();
@@ -188,7 +172,7 @@ int main(int argc, char **argv) {
       return input->OnEvent(event);
     }
 
-    Action current_action = process_key_press(state, event, key_bindings_two);
+    Action current_action = process_key_press(state, event, key_bindings);
 
     if (state.pending_key.size() > 1) {
       state.pending_key.clear();
