@@ -74,6 +74,7 @@ Table designTable(const State &state) {
   Table table = Table(state.data);
   table.SelectCell(state.sel_col, state.sel_row).Border(LIGHT);
   table.SelectCell(state.sel_col, state.sel_row).DecorateCells(inverted);
+  table.SelectCell(state.sel_col, state.sel_row).DecorateCells(focus);
   table.SelectRow(0).Decorate(bold);
   table.SelectRow(0).Border(DOUBLE);
   table.SelectAll().DecorateCellsAlternateRow(
@@ -118,12 +119,12 @@ int main(int argc, char **argv) {
 
   Component table_component = Renderer([&] {
     Table table = designTable(state);
-    Element table_element = table.Render();
+    Element table_element = table.Render() | frame;
     return table_element;
   });
 
   // TODO Rewrite the comp -> element -> comp redundancy when FTXUI > 7.0
-  // available
+  // is available
   Component edit_component = Renderer([&] {
     Element edit_element = hbox({
         text("Edit: "),
@@ -142,14 +143,15 @@ int main(int argc, char **argv) {
   });
 
   Component footer_component = Renderer([] {
-    return text("a: add entry, e: edit cell, c: create new column, d: delete "
-                "row, q: quit, u: undo");
+    return text("a: add entry, e: edit cell, c: create column, C: delete column, d: delete "
+                "row, q: save and quit, Q: quit without saving, u: undo");
   });
 
   Component final_component = Container::Vertical(
       {edit_component | Maybe([&] { return state.mode == Mode::Edit; }),
        add_component | Maybe([&] { return state.mode == Mode::Add; }),
-       table_component | flex, footer_component});
+       footer_component | Maybe([&] {return state.mode != Mode::Add && state.mode != Mode::Edit;}),
+       table_component | flex});
 
   map<Event, Action> key_bindings = {{Event::ArrowUp, Action::move_up},
                                      {Event::ArrowDown, Action::move_down},
