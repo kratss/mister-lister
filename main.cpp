@@ -26,6 +26,7 @@ const map<string, Action> key_bindings_two = {
     {"d", Action::remove},
     {"e", Action::edit},
     {"q", Action::quit},
+    {"u", Action::undo},
     {"/", Action::search},
 
     {"ca", Action::column_add},
@@ -105,8 +106,9 @@ int main(int argc, char **argv) {
     });
   });
 
-  Component footer_component = Renderer([] {
-    return text("a: add entry, e: edit cell, c: create column, C: delete "
+  Component footer_component = Renderer([&] {
+    return text(to_string(state.motion_count) +
+                " a: add entry, e: edit cell, c: create column, C: delete "
                 "column, d: delete "
                 "row, q: save and quit, Q: quit without saving, u: undo");
   });
@@ -142,9 +144,10 @@ int main(int argc, char **argv) {
     // state.data[0][3] = event.character();
     // const auto binding = key_bindings.find(event);
     auto key = event.character();
-    if (isdigit(key[0])){
-      state.motion_count = state.motion_count * 10 + int(key[0]);
-       return true;
+    if (isdigit(key[0])) {
+      state.motion_count = state.motion_count * 10 + (key[0] - '0');
+      state.data[0][0] = state.motion_count;
+      return true;
     }
     state.pending_key += event.character();
 
@@ -196,35 +199,68 @@ int main(int argc, char **argv) {
     switch (current_action) {
 
     case Action::move_up:
-      if (state.sel_row > 0)
-        state.sel_row--;
-      else
+      if (state.sel_row > 0 && state.motion_count > 0 &&
+          state.motion_count <= state.sel_row) {
+        state.sel_row = state.sel_row - state.motion_count;
+      } else if (state.sel_row > 0 && state.motion_count > 0) {
+        state.sel_row = 0;
+      } else if (state.sel_row == 0) {
         state.sel_row = state.data.size() - 1;
+      } else {
+        state.sel_row--;
+      }
+      state.motion_count = 0;
       return true;
 
     case Action::move_down:
-      if (state.sel_row < state.data.size() - 1)
-        state.sel_row++;
-      else
+      if (state.sel_row < state.data.size() && state.motion_count > 0 &&
+          state.motion_count <= state.data.size() - 1 - state.sel_row) {
+        state.sel_row = state.sel_row + state.motion_count;
+      } else if (state.sel_row > 0 && state.motion_count > 0) {
+        state.sel_row = state.data.size() - 1;
+      } else if (state.sel_row == state.data.size() - 1) {
         state.sel_row = 0;
+      } else {
+        state.sel_row++;
+      }
+      state.motion_count = 0;
       return true;
 
     case Action::move_left:
-      if (state.sel_col > 0)
+      if (state.sel_col > 0 && state.motion_count > 0 &&
+          state.motion_count <= state.sel_col) {
+        state.sel_col = state.sel_col - state.motion_count;
+      } else if (state.sel_col > 0 && state.motion_count > 0) {
+        state.sel_col = 0;
+      } else if (state.sel_col == 0) {
+        state.sel_col = state.data[0].size() - 1;
+      } else {
         state.sel_col--;
-      else
-        state.sel_col = state.data[state.sel_row].size() - 1;
+      }
+      state.motion_count = 0;
+      // if (state.sel_col > 0)
+      //   state.sel_col--;
+      // else
+      //   state.sel_col = state.data[state.sel_row].size() - 1;
       return true;
 
     case Action::move_right:
-      if (state.sel_col < state.data[state.sel_row].size() - 1)
-        state.sel_col++;
-      else
+      if (state.sel_col < state.data[0].size() && state.motion_count > 0 &&
+          state.motion_count <= state.data[0].size() - 1 - state.sel_col) {
+        state.sel_col = state.sel_col + state.motion_count;
+      } else if (state.sel_col > 0 && state.motion_count > 0) {
+        state.sel_col = state.data[0].size() - 1;
+      } else if (state.sel_col == state.data[0].size() - 1) {
         state.sel_col = 0;
+      } else {
+        state.sel_col++;
+      }
+      state.motion_count = 0;
       return true;
 
     case Action::add_entry:
       state.mode = Mode::Add;
+      if (state.motion_count == 0) state.motion_count = 1;
       state.data.push_back(blank_row);
       state.sel_row = state.data.size() - 1;
       state.sel_col = 0;
@@ -259,7 +295,13 @@ int main(int argc, char **argv) {
     case Action::remove:
       state.data_history.push_back(state.data);
       state.undo_pos++;
-      state.data.erase(state.data.begin() + state.sel_row);
+      if (state.motion_count == 0)
+        state.motion_count = 1;
+      if (state.motion_count > state.data.size() - state.sel_row - 1 )
+        state.motion_count = state.data.size() - state.sel_row -1;
+      for (int i = 0; i < state.motion_count; i++)
+        state.data.erase(state.data.begin() + state.sel_row);
+      state.motion_count = 0;
       return true;
 
     case Action::quit:
