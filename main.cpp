@@ -1,3 +1,4 @@
+#include "csv.h"
 #include <filesystem>
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/component_base.hpp>
@@ -8,8 +9,7 @@
 #include <map>
 #include <stdexcept>
 #include <string>
-#include "csv.h"
- 
+
 using namespace ftxui;
 using namespace std;
 
@@ -25,8 +25,10 @@ enum class Action {
   column_add,
   column_delete,
   quit,
+  quit_without_saving,
   remove,
   search,
+  undo,
 };
 
 struct Binding {
@@ -40,37 +42,44 @@ struct State {
   Mode mode = Mode::Normal;
   int sel_row = 0;
   int sel_col = 0;
+  vector<vector<vector<string>>> data_history; // undo history
+  int undo_pos = 0;
+
+  State(vector<vector<string>> initial_data, int initial_max_col)
+      : data(initial_data), max_col(initial_max_col) {
+    data_history.push_back(data);
+  }
 };
 
 State columnAdd(const State &state) {
   State new_state = state;
-  new_state.max_col = state.max_col+1;
+  new_state.max_col = state.max_col + 1;
   new_state.data = normalizeRows(state.data, new_state.max_col);
-  new_state.sel_col = new_state.max_col-1; // Fixed off-by-one
+  new_state.sel_col = new_state.max_col - 1; // Fixed off-by-one
   new_state.sel_row = 0;
   new_state.mode = Mode::Edit;
   return new_state;
 }
 
 Table designTable(const State &state) {
-    Table table = Table(state.data);
-    table.SelectCell(state.sel_col, state.sel_row).Border(LIGHT);
-    table.SelectCell(state.sel_col, state.sel_row).DecorateCells(inverted);
-    table.SelectRow(0).Decorate(bold);
-    table.SelectRow(0).Border(DOUBLE);
-    table.SelectAll().DecorateCellsAlternateRow(
-        color(Color::GrayDark) | color(Color::White), 2, 0);
-    table.SelectAll().DecorateCells([](Element element) {
-      return hbox({
-          text(" "),
-          element,
-          text(" "),
-      });
+  Table table = Table(state.data);
+  table.SelectCell(state.sel_col, state.sel_row).Border(LIGHT);
+  table.SelectCell(state.sel_col, state.sel_row).DecorateCells(inverted);
+  table.SelectRow(0).Decorate(bold);
+  table.SelectRow(0).Border(DOUBLE);
+  table.SelectAll().DecorateCellsAlternateRow(
+      color(Color::GrayDark) | color(Color::White), 2, 0);
+  table.SelectAll().DecorateCells([](Element element) {
+    return hbox({
+        text(" "),
+        element,
+        text(" "),
     });
-    return table;
+  });
+  return table;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   if (argc != 2) {
     std::cerr << "Usage: " << (argc > 0 ? argv[0] : "mister-lister")
               << " <file.csv>\n";
@@ -86,7 +95,7 @@ int main(int argc, char** argv) {
       max_col = raw_data[i].size();
   }
   vector<vector<string>> data = normalizeRows(raw_data, max_col);
-  State state = {data,max_col};
+  State state = {data, max_col};
   vector<string> blank_row;
   for (int i = 0; i < state.max_col; i++)
     blank_row.push_back("-");
@@ -103,34 +112,35 @@ int main(int argc, char** argv) {
     Element table_element = table.Render();
     return table_element;
   });
-                                    
-  // TODO Rewrite the comp -> element -> comp redundancy when FTXUI > 7.0 available
-  Component edit_component = Renderer([&] {
-          Element edit_element = hbox({
-              text("Edit: "),
-              input->Render() | flex,
-              text("  Enter: save  Esc: cancel"),
-          });
-          return edit_element;
-    });
 
-  Component add_component = Renderer([&] {
-          return hbox({
-              text("Add: "),
-              input->Render() | flex,
-              text("  Enter: save  Esc: cancel"),
-              });
+  // TODO Rewrite the comp -> element -> comp redundancy when FTXUI > 7.0
+  // available
+  Component edit_component = Renderer([&] {
+    Element edit_element = hbox({
+        text("Edit: "),
+        input->Render() | flex,
+        text("  Enter: save  Esc: cancel"),
+    });
+    return edit_element;
   });
 
+  Component add_component = Renderer([&] {
+    return hbox({
+        text("Add: "),
+        input->Render() | flex,
+        text("  Enter: save  Esc: cancel"),
+    });
+  });
 
-  Component footer_component = Renderer([] { return text("a: Add entry, e: Edit cell, c: Create new column, d: Delete row, q: quit"); });
+  Component footer_component = Renderer([] {
+    return text("a: Add entry, e: Edit cell, c: Create new column, d: Delete "
+                "row, q: quit");
+  });
 
-  Component final_component = Container::Vertical({
-                                                    edit_component | Maybe([&] {return state.mode==Mode::Edit;}),
-                                                    add_component | Maybe([&] {return state.mode==Mode::Add;}),
-                                                    table_component | flex,
-                                                    footer_component
-                                                  });
+  Component final_component = Container::Vertical(
+      {edit_component | Maybe([&] { return state.mode == Mode::Edit; }),
+       add_component | Maybe([&] { return state.mode == Mode::Add; }),
+       table_component | flex, footer_component});
 
   map<Event, Action> key_bindings = {{Event::ArrowUp, Action::move_up},
                                      {Event::ArrowDown, Action::move_down},
@@ -141,13 +151,15 @@ int main(int argc, char** argv) {
                                      {Event::h, Action::move_left},
                                      {Event::l, Action::move_right},
                                      {Event::a, Action::add_entry},
+                                     {Event::c, Action::column_add},
                                      {Event::e, Action::edit},
                                      {Event::d, Action::remove},
                                      {Event::q, Action::quit},
-                                     {Event::c, Action::column_add},
+                                     {Event::Q, Action::quit_without_saving},
+                                     {Event::u, Action::undo},
                                      {Event::Character('/'), Action::search}};
 
-  //TODO support two character commands
+  // TODO support two character commands
   const vector<Binding> key_bindings_two = {
       {"k", Action::move_up},
       {"j", Action::move_down},
@@ -177,6 +189,8 @@ int main(int argc, char** argv) {
     switch (state.mode) {
     case Mode::Edit:
       if (event == Event::Return) {
+        state.data_history.push_back(state.data);
+        state.undo_pos++;
         state.data[state.sel_row][state.sel_col] = input_buffer;
         state.mode = Mode::Normal;
         break;
@@ -186,6 +200,8 @@ int main(int argc, char** argv) {
 
     case Mode::Add:
       if (event == Event::Return) {
+        state.data_history.push_back(state.data);
+        state.undo_pos++;
         state.data[state.sel_row][state.sel_col] = input_buffer;
         if (state.sel_col + 1 < state.max_col) {
           state.sel_col++;
@@ -251,15 +267,31 @@ int main(int argc, char** argv) {
       state.mode = Mode::Edit;
       input_buffer.clear();
       input_placeholder =
-          state.data[state.sel_row][state.sel_col]; // load current value input->TakeFocus();
+          state.data[state.sel_row]
+                    [state.sel_col]; // load current value input->TakeFocus();
+      return true;
+
+    case Action::remove:
+      state.data_history.push_back(state.data);
+      state.undo_pos++;
+      state.data.erase(state.data.begin() + state.sel_row);
       return true;
 
     case Action::quit:
       writeData(path, delimiter, state.data);
       screen.Exit();
 
-    case Action::remove:
-      state.data.erase(state.data.begin() + state.sel_row);
+    case Action::quit_without_saving:
+      screen.Exit();
+
+    case Action::undo:
+      if (state.undo_pos > 0){
+        state.undo_pos--;
+        state.data = state.data_history[state.undo_pos];
+        state.data_history.erase(state.data_history.begin() + state.undo_pos,
+                                 state.data_history.end());
+         return true;
+         }
     }
     return false;
   });
