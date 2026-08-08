@@ -26,16 +26,13 @@ State column_delete(const State &state) {
   return new_state;
 }
 
-
 Table designTable(const State &state) {
   Table table = Table(state.data);
-  table.SelectCell(state.sel_col, state.sel_row).Border(LIGHT);
-  table.SelectCell(state.sel_col, state.sel_row).DecorateCells(inverted);
-  table.SelectCell(state.sel_col, state.sel_row).DecorateCells(focus);
-  table.SelectRow(0).Decorate(bold);
-  table.SelectRow(0).Border(DOUBLE);
-  table.SelectAll().DecorateCellsAlternateRow(
-      color(Color::GrayDark) | color(Color::White), 2, 0);
+  auto focused_cell = table.SelectCell(state.sel_col,state.sel_row);
+  auto focused_row = table.SelectRow(state.sel_row);
+  auto all_cells = table.SelectAll();
+  auto header_cells = table.SelectRow(0);
+
   table.SelectAll().DecorateCells([](Element element) {
     return hbox({
         text(" "),
@@ -43,5 +40,14 @@ Table designTable(const State &state) {
         text(" "),
     });
   });
+
+  focused_cell.Decorate(bgcolor(Color::Magenta));
+  focused_row.Decorate(bgcolor(Color::Yellow));
+  focused_row.Decorate(color(Color::Black));
+  header_cells.Decorate(bold);
+  header_cells.Decorate(bgcolor(Color::Black));
+  all_cells.DecorateAlternateRow(
+      bgcolor(Color::GrayDark) | bgcolor(Color::White), 2, 0);
+   
   return table;
 }
