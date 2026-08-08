@@ -1,4 +1,6 @@
 #include "csv.h"
+#include "modify_table.h"
+#include "types.h"
 #include <filesystem>
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/component_base.hpp>
@@ -7,90 +9,47 @@
 #include <ftxui/dom/table.hpp>
 #include <iostream>
 #include <map>
-#include <stdexcept>
 #include <string>
 
 using namespace ftxui;
 using namespace std;
 
-enum class Mode { Normal, Add, Edit, Search, Column_Add };
+const map<string, Action> key_bindings_two = {
+    {"k", Action::move_up},
+    {"j", Action::move_down},
+    {"h", Action::move_left},
+    {"l", Action::move_right},
+    {"up", Action::move_up},
+    //{Event::ArrowUp.str(), Action::move_up}, // if you still want arrows
 
-enum class Action {
-  move_up,
-  move_down,
-  move_left,
-  move_right,
-  add_entry,
-  edit,
-  column_add,
-  column_delete,
-  quit,
-  quit_without_saving,
-  remove,
-  search,
-  undo,
+    {"a", Action::add_entry},
+    {"d", Action::remove},
+    {"e", Action::edit},
+    {"q", Action::quit},
+    {"/", Action::search},
+
+    {"ca", Action::column_add},
+    {"cd", Action::column_delete},
 };
 
-struct Binding {
-  string keys;
-  Action action;
-};
+Action process_key_press(State &state, Event event,
+                         map<string, Action> key_bindings) {
+  string pending_key = state.pending_key;
 
-struct State {
-  vector<vector<string>> data;
-  int max_col = 0;
-  Mode mode = Mode::Normal;
-  int sel_row = 0;
-  int sel_col = 0;
-  vector<vector<vector<string>>> data_history; // undo history
-  int undo_pos = 0;
+  auto command = key_bindings.find(pending_key);
+  Action current_action;
 
-  State(vector<vector<string>> initial_data, int initial_max_col)
-      : data(initial_data), max_col(initial_max_col) {
-    data_history.push_back(data);
-  }
-};
-
-State column_add(const State &state) {
-  State new_state = state;
-  new_state.max_col = state.max_col + 1;
-
-  for (auto &row : new_state.data) {
-    row.insert(row.begin() + state.sel_col + 1, "-");
+  // If command is an exact match
+  if (command != key_bindings.end()) {
+    current_action = command->second;
+    return current_action;
   }
 
-  new_state.sel_col = state.sel_col + 1; 
-  new_state.sel_row = 0;
-  new_state.mode = Mode::Edit;
-  return new_state;
-}
-
-State column_delete(const State &state) {
-  State new_state = state;
-  new_state.max_col = state.max_col - 1;
-  for (int i = 0; i < state.data.size(); i++) {
-    new_state.data[i].erase(new_state.data[i].begin() + state.sel_col);
+  for (const auto &[seq, _] : key_bindings) {
+    if (seq.starts_with(pending_key))
+      return Action::none;
   }
-  return new_state;
-}
-
-Table designTable(const State &state) {
-  Table table = Table(state.data);
-  table.SelectCell(state.sel_col, state.sel_row).Border(LIGHT);
-  table.SelectCell(state.sel_col, state.sel_row).DecorateCells(inverted);
-  table.SelectCell(state.sel_col, state.sel_row).DecorateCells(focus);
-  table.SelectRow(0).Decorate(bold);
-  table.SelectRow(0).Border(DOUBLE);
-  table.SelectAll().DecorateCellsAlternateRow(
-      color(Color::GrayDark) | color(Color::White), 2, 0);
-  table.SelectAll().DecorateCells([](Element element) {
-    return hbox({
-        text(" "),
-        element,
-        text(" "),
-    });
-  });
-  return table;
+  return Action::none;
 }
 
 int main(int argc, char **argv) {
@@ -178,30 +137,21 @@ int main(int argc, char **argv) {
                                      {Event::u, Action::undo},
                                      {Event::Character('/'), Action::search}};
 
-  // TODO support two character commands
-  const vector<Binding> key_bindings_two = {
-      {"k", Action::move_up},
-      {"j", Action::move_down},
-      {"h", Action::move_left},
-      {"l", Action::move_right},
-      {"up", Action::move_up},
-      //{Event::ArrowUp.str(), Action::move_up}, // if you still want arrows
-
-      {"a", Action::add_entry},
-      {"e", Action::edit},
-      {"q", Action::quit},
-      {"/", Action::search},
-
-      {"ha", Action::column_add},
-      {"hd", Action::column_delete},
-  };
-
   // Catch keyboard input
   final_component = CatchEvent(final_component, [&](Event event) {
-    const auto binding = key_bindings.find(event);
+    // state.data[0][3] = event.character();
+    // const auto binding = key_bindings.find(event);
+    auto key = event.character();
+    if (isdigit(key[0])){
+      state.motion_count = state.motion_count * 10 + int(key[0]);
+       return true;
+    }
+    state.pending_key += event.character();
 
     if (event == Event::Escape) {
       state.mode = Mode::Normal;
+      state.pending_key.clear();
+      state.motion_count = 0;
       return true;
     }
 
@@ -235,9 +185,15 @@ int main(int argc, char **argv) {
       return input->OnEvent(event);
     }
 
-    if (binding == key_bindings.end())
-      return false; // Handle undefined events
-    switch (binding->second) {
+    Action current_action = process_key_press(state, event, key_bindings_two);
+
+    if (state.pending_key.size() > 1) {
+      state.pending_key.clear();
+    } else if (current_action != Action::none) {
+      state.pending_key.clear();
+    }
+
+    switch (current_action) {
 
     case Action::move_up:
       if (state.sel_row > 0)
@@ -321,8 +277,10 @@ int main(int argc, char **argv) {
                                  state.data_history.end());
         return true;
       }
+    case Action::none:
+      return true;
     }
-    return false;
+    return true;
   });
 
   screen.Loop(final_component);
