@@ -51,11 +51,15 @@ struct State {
   }
 };
 
-State columnAdd(const State &state) {
+State column_add(const State &state) {
   State new_state = state;
   new_state.max_col = state.max_col + 1;
-  new_state.data = normalizeRows(state.data, new_state.max_col);
-  new_state.sel_col = new_state.max_col - 1; // Fixed off-by-one
+
+  for (auto &row : new_state.data) {
+    row.insert(row.begin() + state.sel_col + 1, "-");
+  }
+
+  new_state.sel_col = state.sel_col + 1; 
   new_state.sel_row = 0;
   new_state.mode = Mode::Edit;
   return new_state;
@@ -143,14 +147,17 @@ int main(int argc, char **argv) {
   });
 
   Component footer_component = Renderer([] {
-    return text("a: add entry, e: edit cell, c: create column, C: delete column, d: delete "
+    return text("a: add entry, e: edit cell, c: create column, C: delete "
+                "column, d: delete "
                 "row, q: save and quit, Q: quit without saving, u: undo");
   });
 
   Component final_component = Container::Vertical(
       {edit_component | Maybe([&] { return state.mode == Mode::Edit; }),
        add_component | Maybe([&] { return state.mode == Mode::Add; }),
-       footer_component | Maybe([&] {return state.mode != Mode::Add && state.mode != Mode::Edit;}),
+       footer_component | Maybe([&] {
+         return state.mode != Mode::Add && state.mode != Mode::Edit;
+       }),
        table_component | flex});
 
   map<Event, Action> key_bindings = {{Event::ArrowUp, Action::move_up},
@@ -272,7 +279,7 @@ int main(int argc, char **argv) {
     case Action::column_add:
       state.data_history.push_back(state.data);
       state.undo_pos++;
-      state = columnAdd(state);
+      state = column_add(state);
       input_buffer.clear();
       input_placeholder = "New field";
       return true;
