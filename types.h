@@ -14,6 +14,8 @@ enum class Action {
   edit,
   column_add,
   column_delete,
+  go_to_start,
+  go_to_end,
   none,
   quit,
   quit_without_saving,

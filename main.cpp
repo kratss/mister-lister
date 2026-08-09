@@ -25,7 +25,6 @@ const map<string, Action> key_bindings = {
     {"a", Action::add_entry},
     {"d", Action::remove},
     {"e", Action::edit},
-    {"wq", Action::quit},
     {"r", Action::edit},
     {"u", Action::undo},
     {"/", Action::search},
@@ -33,6 +32,9 @@ const map<string, Action> key_bindings = {
     {"q!", Action::quit_without_saving},
     {"ca", Action::column_add},
     {"cd", Action::column_delete},
+    {"gg", Action::go_to_start},
+    {"ge", Action::go_to_end},
+    {"wq", Action::quit},
 };
 
 Action process_key_press(State &state, Event event,
@@ -276,6 +278,14 @@ int main(int argc, char **argv) {
                     [state.sel_col]; // load current value input->TakeFocus();
       return true;
 
+    case Action::go_to_end:
+      state.sel_row = state.data.size()-1;
+      return true;
+
+    case Action::go_to_start:
+      state.sel_row = 0;
+      return true;
+      
     case Action::remove:
       state.data_history.push_back(state.data);
       state.undo_pos++;
