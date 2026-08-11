@@ -1,6 +1,7 @@
 #include "csv.h"
 #include "modify_table.h"
 #include "types.h"
+#include "utilities.h"
 #include <filesystem>
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/component_base.hpp>
@@ -19,8 +20,6 @@ const map<string, Action> key_bindings = {
     {"j", Action::move_down},
     {"h", Action::move_left},
     {"l", Action::move_right},
-    {"up", Action::move_up},
-    //{Event::ArrowUp.str(), Action::move_up}, // if you still want arrows
 
     {"a", Action::add_entry},
     {"d", Action::remove},
@@ -28,6 +27,7 @@ const map<string, Action> key_bindings = {
     {"r", Action::edit},
     {"u", Action::undo},
     {"/", Action::search},
+    {" ", Action::show_key_map},
 
     {"q!", Action::quit_without_saving},
     {"ca", Action::column_add},
@@ -58,26 +58,26 @@ Action process_key_press(State &state, Event event,
 }
 
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    std::cerr << "Usage: " << (argc > 0 ? argv[0] : "mister-lister")
-              << " <file.csv>\n";
+  auto [path, delimiter, error_message] = parse_args(argc, argv);
+  if (!error_message.empty()) {
+    cerr << error_message;
     return 1;
   }
 
-  char delimiter = '\x1F';
-  filesystem::path path = argv[1];
   vector<vector<string>> raw_data = readData(path, delimiter);
   int max_col = 0;
   for (int i = 0; i < raw_data.size(); i++) {
     if (raw_data[i].size() > max_col)
       max_col = raw_data[i].size();
   }
+
   vector<vector<string>> data = normalizeRows(raw_data, max_col);
   State state = {data, max_col};
   vector<string> blank_row;
   for (int i = 0; i < state.max_col; i++)
     blank_row.push_back("-");
   auto screen = ScreenInteractive::Fullscreen();
+  bool show_popup = false;
 
   string input_placeholder = "PLACHOLDER";
   InputOption input_options;
@@ -117,7 +117,25 @@ int main(int argc, char **argv) {
                 "row, q: save and quit, Q: quit without saving, u: undo");
   });
 
-  Component final_component = Container::Vertical(
+  Element key_binding_text = vbox({
+      text("wq    save and quit"),
+      text("e     edit"),
+      text("a     add row"),
+      text("ca    add column"),
+      text("cd    delete column"),
+      text("d     delete row")
+  });
+
+  Component window = Window({
+      .inner = Renderer([&] { return key_binding_text; }),
+      .title = "Key Command",
+      .left = 0,
+      .top = 0,
+      .width = 15,
+      .height = 20,
+  });
+
+  Component main_component = Container::Vertical(
       {edit_component | Maybe([&] { return state.mode == Mode::Edit; }),
        add_component | Maybe([&] { return state.mode == Mode::Add; }),
        footer_component | Maybe([&] {
@@ -125,8 +143,10 @@ int main(int argc, char **argv) {
        }),
        table_component | flex});
 
+  main_component |= Modal(window, &show_popup);
+
   // Catch keyboard input
-  final_component = CatchEvent(final_component, [&](Event event) {
+  main_component = CatchEvent(main_component, [&](Event event) {
     // state.data[0][3] = event.character();
     // const auto binding = key_bindings.find(event);
     auto key = event.character();
@@ -224,10 +244,6 @@ int main(int argc, char **argv) {
         state.sel_col--;
       }
       state.motion_count = 0;
-      // if (state.sel_col > 0)
-      //   state.sel_col--;
-      // else
-      //   state.sel_col = state.data[state.sel_row].size() - 1;
       return true;
 
     case Action::move_right:
@@ -246,7 +262,8 @@ int main(int argc, char **argv) {
 
     case Action::add_entry:
       state.mode = Mode::Add;
-      if (state.motion_count == 0) state.motion_count = 1;
+      if (state.motion_count == 0)
+        state.motion_count = 1;
       state.data.push_back(blank_row);
       state.sel_row = state.data.size() - 1;
       state.sel_col = 0;
@@ -279,23 +296,30 @@ int main(int argc, char **argv) {
       return true;
 
     case Action::go_to_end:
-      state.sel_row = state.data.size()-1;
+      state.sel_row = state.data.size() - 1;
       return true;
 
     case Action::go_to_start:
       state.sel_row = 0;
       return true;
-      
+
     case Action::remove:
       state.data_history.push_back(state.data);
       state.undo_pos++;
       if (state.motion_count == 0)
         state.motion_count = 1;
-      if (state.motion_count > state.data.size() - state.sel_row - 1 )
-        state.motion_count = state.data.size() - state.sel_row -1;
+      if (state.motion_count > state.data.size() - state.sel_row - 1)
+        state.motion_count = state.data.size() - state.sel_row - 1;
       for (int i = 0; i < state.motion_count; i++)
         state.data.erase(state.data.begin() + state.sel_row);
       state.motion_count = 0;
+      return true;
+
+    case Action::show_key_map:
+      if (show_popup)
+        show_popup = false;
+      else
+        show_popup = true;
       return true;
 
     case Action::quit:
@@ -319,5 +343,5 @@ int main(int argc, char **argv) {
     return true;
   });
 
-  screen.Loop(final_component);
+  screen.Loop(main_component);
 }

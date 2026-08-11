@@ -6,6 +6,7 @@ find_package(ftxui REQUIRED)
 add_executable(mister-lister
   main.cpp
   csv.cpp
-  modify_table.cpp)
+  modify_table.cpp
+  utilities.cpp)
 target_link_libraries(mister-lister PRIVATE ftxui::component ftxui::dom ftxui::screen)
 
