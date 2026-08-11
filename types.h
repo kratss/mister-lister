@@ -21,6 +21,7 @@ enum class Action {
   quit_without_saving,
   remove,
   search,
+  show_key_map,
   undo,
 };
 
