@@ -1,7 +1,8 @@
 #pragma once
 #include <string>
 #include <vector>
-
+#include <ftxui/component/component_base.hpp>
+#include <ftxui/component/component.hpp>
 
 enum class Mode { Normal, Add, Edit, Search, Column_Add, Key_Map };
 
@@ -41,6 +42,11 @@ struct State {
   std::string pending_key;
   int motion_count = 0; // for vim style `5k`: move up 5 lines
   int key_map_int = 0;
+
+  std::string input_placeholder = "PLACHOLDER";
+  std::string input_buffer;
+  ftxui::InputOption input_options = {.placeholder = &input_placeholder};
+  ftxui::Component input;
 
   State(std::vector<std::vector<std::string>> initial_data, int initial_max_col)
       : data(initial_data), max_col(initial_max_col) {

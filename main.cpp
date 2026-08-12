@@ -60,8 +60,8 @@ int main(int argc, char **argv) {
   string input_placeholder = "PLACHOLDER";
   InputOption input_options;
   input_options.placeholder = &input_placeholder;
-  std::string input_buffer;
-  Component input = Input(&input_buffer, input_options);
+  // std::string state.input_buffer;
+  state.input = Input(&state.input_buffer, input_options);
 
   Component table_component = Renderer([&] {
     Table table = designTable(state);
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   Component edit_component = Renderer([&] {
     Element edit_element = hbox({
         text("Edit: "),
-        input->Render() | flex,
+        state.input->Render() | flex,
         text("  Enter: save  Esc: cancel"),
     });
     return edit_element;
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
   Component add_component = Renderer([&] {
     return hbox({
         text("Add: "),
-        input->Render() | flex,
+        state.input->Render() | flex,
         text("  Enter: save  Esc: cancel"),
     });
   });
@@ -114,6 +114,9 @@ int main(int argc, char **argv) {
 
   main_component |= Modal(window, &show_popup);
 
+
+
+  
   // Catch keyboard input
   main_component = CatchEvent(main_component, [&](Event event) {
     // state.data[0][3] = event.character();
@@ -138,29 +141,29 @@ int main(int argc, char **argv) {
       if (event == Event::Return) {
         state.data_history.push_back(state.data);
         state.undo_pos++;
-        state.data[state.sel_row][state.sel_col] = input_buffer;
+        state.data[state.sel_row][state.sel_col] = state.input_buffer;
         state.mode = Mode::Normal;
         break;
       } else {
-        return input->OnEvent(event);
+        return state.input->OnEvent(event);
       }
 
     case Mode::Add:
       if (event == Event::Return) {
         state.data_history.push_back(state.data);
         state.undo_pos++;
-        state.data[state.sel_row][state.sel_col] = input_buffer;
+        state.data[state.sel_row][state.sel_col] = state.input_buffer;
         if (state.sel_col + 1 < state.max_col) {
           state.sel_col++;
           input_placeholder = state.data[0][state.sel_col]; // header
-          input_buffer.erase();
+          state.input_buffer.erase();
           return true;
         } else {
           state.mode = Mode::Normal;
           return true;
         }
       }
-      return input->OnEvent(event);
+      return state.input->OnEvent(event);
     }
 
     Action current_action = process_key_press(state, event, key_bindings);
@@ -236,7 +239,7 @@ int main(int argc, char **argv) {
       state.data.push_back(blank_row);
       state.sel_row = state.data.size() - 1;
       state.sel_col = 0;
-      input_buffer.clear();
+      state.input_buffer.clear();
       input_placeholder = state.data[0][state.sel_col]; // header
       return true;
 
@@ -244,7 +247,7 @@ int main(int argc, char **argv) {
       state.data_history.push_back(state.data);
       state.undo_pos++;
       state = column_add(state);
-      input_buffer.clear();
+      state.input_buffer.clear();
       input_placeholder = "New field";
       return true;
 
@@ -252,13 +255,13 @@ int main(int argc, char **argv) {
       state.data_history.push_back(state.data);
       state.undo_pos++;
       state = column_delete(state);
-      input_buffer.clear();
+      state.input_buffer.clear();
       input_placeholder = "New field";
       return true;
 
     case Action::edit:
       state.mode = Mode::Edit;
-      input_buffer.clear();
+      state.input_buffer.clear();
       input_placeholder =
           state.data[state.sel_row]
                     [state.sel_col]; // load current value input->TakeFocus();
