@@ -114,13 +114,20 @@ int main(int argc, char **argv) {
 
   main_component |= Modal(window, &show_popup);
 
+  using Handler = std::function<bool(State &, ftxui::Event, string)>;
 
+  std::map<Mode, Handler> handlers = {
+      {Mode::Edit,
+       [](State &s, ftxui::Event e, string i) { return handle_edit(s, e, i); }},
+      {Mode::Add,
+       [](State &s, ftxui::Event e, string i) { return handle_add(s, e, i); }},
+      {Mode::Normal,
+       [](State &s, ftxui::Event e, string i) { return handle_normal(s, e, i); }},
+  };
 
-  
-  // Catch keyboard input
+  auto exit = screen.ExitLoopClosure();
+
   main_component = CatchEvent(main_component, [&](Event event) {
-    // state.data[0][3] = event.character();
-    // const auto binding = key_bindings.find(event);
     auto key = event.character();
     if (isdigit(key[0])) {
       state.motion_count = state.motion_count * 10 + (key[0] - '0');
@@ -136,183 +143,18 @@ int main(int argc, char **argv) {
       return true;
     }
 
-    switch (state.mode) {
-    case Mode::Edit:
-      if (event == Event::Return) {
-        state.data_history.push_back(state.data);
-        state.undo_pos++;
-        state.data[state.sel_row][state.sel_col] = state.input_buffer;
-        state.mode = Mode::Normal;
-        break;
-      } else {
-        return state.input->OnEvent(event);
-      }
-
-    case Mode::Add:
-      if (event == Event::Return) {
-        state.data_history.push_back(state.data);
-        state.undo_pos++;
-        state.data[state.sel_row][state.sel_col] = state.input_buffer;
-        if (state.sel_col + 1 < state.max_col) {
-          state.sel_col++;
-          input_placeholder = state.data[0][state.sel_col]; // header
-          state.input_buffer.erase();
-          return true;
-        } else {
-          state.mode = Mode::Normal;
-          return true;
-        }
-      }
-      return state.input->OnEvent(event);
-    }
-
-    Action current_action = process_key_press(state, event, key_bindings);
+    state.current_action = process_key_press(state, event, key_bindings);
 
     if (state.pending_key.size() > 1) {
       state.pending_key.clear();
-    } else if (current_action != Action::none) {
+    } else if (state.current_action != Action::none) {
       state.pending_key.clear();
     }
 
-    switch (current_action) {
-
-    case Action::move_up:
-      if (state.sel_row > 0 && state.motion_count > 0 &&
-          state.motion_count <= state.sel_row) {
-        state.sel_row = state.sel_row - state.motion_count;
-      } else if (state.sel_row > 0 && state.motion_count > 0) {
-        state.sel_row = 0;
-      } else if (state.sel_row == 0) {
-        state.sel_row = state.data.size() - 1;
-      } else {
-        state.sel_row--;
-      }
-      state.motion_count = 0;
-      return true;
-
-    case Action::move_down:
-      if (state.sel_row < state.data.size() && state.motion_count > 0 &&
-          state.motion_count <= state.data.size() - 1 - state.sel_row) {
-        state.sel_row = state.sel_row + state.motion_count;
-      } else if (state.sel_row > 0 && state.motion_count > 0) {
-        state.sel_row = state.data.size() - 1;
-      } else if (state.sel_row == state.data.size() - 1) {
-        state.sel_row = 0;
-      } else {
-        state.sel_row++;
-      }
-      state.motion_count = 0;
-      return true;
-
-    case Action::move_left:
-      if (state.sel_col > 0 && state.motion_count > 0 &&
-          state.motion_count <= state.sel_col) {
-        state.sel_col = state.sel_col - state.motion_count;
-      } else if (state.sel_col > 0 && state.motion_count > 0) {
-        state.sel_col = 0;
-      } else if (state.sel_col == 0) {
-        state.sel_col = state.data[0].size() - 1;
-      } else {
-        state.sel_col--;
-      }
-      state.motion_count = 0;
-      return true;
-
-    case Action::move_right:
-      if (state.sel_col < state.data[0].size() && state.motion_count > 0 &&
-          state.motion_count <= state.data[0].size() - 1 - state.sel_col) {
-        state.sel_col = state.sel_col + state.motion_count;
-      } else if (state.sel_col > 0 && state.motion_count > 0) {
-        state.sel_col = state.data[0].size() - 1;
-      } else if (state.sel_col == state.data[0].size() - 1) {
-        state.sel_col = 0;
-      } else {
-        state.sel_col++;
-      }
-      state.motion_count = 0;
-      return true;
-
-    case Action::add_entry:
-      state.mode = Mode::Add;
-      if (state.motion_count == 0)
-        state.motion_count = 1;
-      state.data.push_back(blank_row);
-      state.sel_row = state.data.size() - 1;
-      state.sel_col = 0;
-      state.input_buffer.clear();
-      input_placeholder = state.data[0][state.sel_col]; // header
-      return true;
-
-    case Action::column_add:
-      state.data_history.push_back(state.data);
-      state.undo_pos++;
-      state = column_add(state);
-      state.input_buffer.clear();
-      input_placeholder = "New field";
-      return true;
-
-    case Action::column_delete:
-      state.data_history.push_back(state.data);
-      state.undo_pos++;
-      state = column_delete(state);
-      state.input_buffer.clear();
-      input_placeholder = "New field";
-      return true;
-
-    case Action::edit:
-      state.mode = Mode::Edit;
-      state.input_buffer.clear();
-      input_placeholder =
-          state.data[state.sel_row]
-                    [state.sel_col]; // load current value input->TakeFocus();
-      return true;
-
-    case Action::go_to_end:
-      state.sel_row = state.data.size() - 1;
-      return true;
-
-    case Action::go_to_start:
-      state.sel_row = 0;
-      return true;
-
-    case Action::remove:
-      state.data_history.push_back(state.data);
-      state.undo_pos++;
-      if (state.motion_count == 0)
-        state.motion_count = 1;
-      if (state.motion_count > state.data.size() - state.sel_row - 1)
-        state.motion_count = state.data.size() - state.sel_row - 1;
-      for (int i = 0; i < state.motion_count; i++)
-        state.data.erase(state.data.begin() + state.sel_row);
-      state.motion_count = 0;
-      return true;
-
-    case Action::show_key_map:
-      if (show_popup)
-        show_popup = false;
-      else
-        show_popup = true;
-      return true;
-
-    case Action::quit:
-      writeData(path, delimiter, state.data);
-      screen.Exit();
-
-    case Action::quit_without_saving:
-      screen.Exit();
-
-    case Action::undo:
-      if (state.undo_pos > 0) {
-        state.undo_pos--;
-        state.data = state.data_history[state.undo_pos];
-        state.data_history.erase(state.data_history.begin() + state.undo_pos,
-                                 state.data_history.end());
-        return true;
-      }
-    case Action::none:
-      return true;
+    if (auto it = handlers.find(state.mode); it != handlers.end()) {
+      return it->second(state, event, input_placeholder);
     }
-    return true;
+
   });
-  screen.Loop(main_component);
+    screen.Loop(main_component);
 }

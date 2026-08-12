@@ -9,7 +9,6 @@
 std::tuple<std::filesystem::path, char, std::string> parse_args(int argc,
                                                                 char *argv[]);
 
-
-std::optional<bool> do_mode_edit(State &state,
-                                 std::shared_ptr<ftxui::ComponentBase> &input,
-                                 ftxui::Event &event, std::string &input_buffer);
+bool handle_edit(State &state, ftxui::Event &event, std::string &input_placeholder);
+bool handle_add(State &state, ftxui::Event &event, std::string &input_placeholder);
+bool handle_normal(State &state, ftxui::Event &event, std::string &input_placeholder);
