@@ -1,7 +1,12 @@
+#include "types.h"
 #include <filesystem>
 #include <fstream>
+#include <ftxui/component/event.hpp>
+#include <optional>
 #include <string_view>
 #include <tuple>
+
+using namespace ftxui;
 
 std::tuple<std::filesystem::path, char, std::string> parse_args(int argc,
                                                                 char *argv[]) {
@@ -36,4 +41,19 @@ std::tuple<std::filesystem::path, char, std::string> parse_args(int argc,
   }
 
   return {path, delimiter, error_message};
+}
+
+std::optional<bool> do_mode_edit(State &state,
+                                 std::shared_ptr<ComponentBase> &input,
+                                 Event &event, std::string &input_buffer) {
+
+  if (event == Event::Return) {
+    state.data_history.push_back(state.data);
+    state.undo_pos++;
+    state.data[state.sel_row][state.sel_col] = input_buffer;
+    state.mode = Mode::Normal;
+    return std::nullopt;
+  } else {
+    return true;
+  }
 }

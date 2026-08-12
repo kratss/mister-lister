@@ -1,13 +1,10 @@
 #include "csv.h"
-
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 
-
-
-std::vector<std::vector<std::string>> readData(const std::filesystem::path &path,
-                                const char &delimiter) {
+std::vector<std::vector<std::string>>
+readData(const std::filesystem::path &path, const char &delimiter) {
   std::ifstream file(path);
   if (!file) {
     throw std::runtime_error("Unable to open file");
@@ -31,7 +28,7 @@ void writeData(const std::filesystem::path &path, const char &delimiter,
   std::string filestring;
   for (std::vector<std::string> row : data) {
     filestring.append(row[0]);
-    for (int j = 1; j < row.size(); j++) {
+    for (int j = 1; j < row.size() - 1; j++) {
       filestring.push_back(delimiter);
       filestring.append(row[j]);
     }
@@ -40,8 +37,9 @@ void writeData(const std::filesystem::path &path, const char &delimiter,
   file << filestring;
 }
 
-std::vector<std::vector<std::string>> normalizeRows(const std::vector<std::vector<std::string>> &data,
-                                     const int &max_col) {
+std::vector<std::vector<std::string>>
+normalizeRows(const std::vector<std::vector<std::string>> &data,
+              const int &max_col) {
   std::vector<std::vector<std::string>> normalized_data = data;
   for (int i = 0; i < data.size(); i++) {
     for (int j = data[i].size(); j < max_col; j++) {
@@ -50,4 +48,3 @@ std::vector<std::vector<std::string>> normalizeRows(const std::vector<std::vecto
   }
   return normalized_data;
 }
-

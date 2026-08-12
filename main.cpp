@@ -1,8 +1,8 @@
+#include "config.h"
 #include "csv.h"
 #include "modify_table.h"
 #include "types.h"
 #include "utilities.h"
-#include <filesystem>
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/component_base.hpp>
 #include <ftxui/component/screen_interactive.hpp>
@@ -14,28 +14,6 @@
 
 using namespace ftxui;
 using namespace std;
-
-const map<string, Action> key_bindings = {
-    {"k", Action::move_up},
-    {"j", Action::move_down},
-    {"h", Action::move_left},
-    {"l", Action::move_right},
-
-    {"a", Action::add_entry},
-    {"d", Action::remove},
-    {"e", Action::edit},
-    {"r", Action::edit},
-    {"u", Action::undo},
-    {"/", Action::search},
-    {" ", Action::show_key_map},
-
-    {"q!", Action::quit_without_saving},
-    {"ca", Action::column_add},
-    {"cd", Action::column_delete},
-    {"gg", Action::go_to_start},
-    {"ge", Action::go_to_end},
-    {"wq", Action::quit},
-};
 
 Action process_key_press(State &state, Event event,
                          map<string, Action> key_bindings) {
@@ -117,21 +95,12 @@ int main(int argc, char **argv) {
                 "row, q: save and quit, Q: quit without saving, u: undo");
   });
 
-  Element key_binding_text = vbox({
-      text("wq    save and quit"),
-      text("e     edit"),
-      text("a     add row"),
-      text("ca    add column"),
-      text("cd    delete column"),
-      text("d     delete row")
-  });
-
   Component window = Window({
-      .inner = Renderer([&] { return key_binding_text; }),
+      .inner = Renderer([&] { return key_bindings_text[state.key_map_int]; }),
       .title = "Key Command",
       .left = 0,
       .top = 0,
-      .width = 15,
+      .width = 35,
       .height = 20,
   });
 
@@ -342,6 +311,5 @@ int main(int argc, char **argv) {
     }
     return true;
   });
-
   screen.Loop(main_component);
 }
