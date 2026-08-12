@@ -25,7 +25,15 @@ std::tuple<std::filesystem::path, char, std::string> parse_args(int argc,
     }
   }
 
-  std::ifstream file(path);
-  if (!file.is_open()) error_message = "Unable to open file";    
+  if (!std::filesystem::exists(path)) {
+  }
+
+  std::ofstream file(path);
+  if (!file.is_open()) {
+    error_message = "Unable to open file";
+  } else if (std::filesystem::file_size(path) == 0) {
+    file << "-" << delimiter;
+  }
+
   return {path, delimiter, error_message};
 }
