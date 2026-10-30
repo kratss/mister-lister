@@ -33,13 +33,12 @@ std::tuple<std::filesystem::path, char, std::string> parse_args(int argc,
   }
 
   if (!std::filesystem::exists(path)) {
-  }
-
-  std::ofstream file(path);
-  if (!file.is_open()) {
-    error_message = "Unable to open file";
-  } else if (std::filesystem::file_size(path) == 0) {
-    file << "-" << delimiter;
+    std::ofstream file(path);
+    if (!file.is_open()) {
+      error_message = "Unable to open file";
+    } else {
+      file << "-" << delimiter;
+    }
   }
 
   return {path, delimiter, error_message};
@@ -204,7 +203,12 @@ bool handle_normal(State &state, ftxui::Event &event,
 
   case Action::quit:
     writeData(state.path, state.delimiter, state.data);
+    state.exit = true;
+    return true;
+
   case Action::quit_without_saving:
+    state.exit = true;
+    return true;
 
   case Action::undo:
     if (state.undo_pos > 0) {

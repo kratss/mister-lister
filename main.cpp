@@ -51,6 +51,8 @@ int main(int argc, char **argv) {
 
   vector<vector<string>> data = normalizeRows(raw_data, max_col);
   State state = {data, max_col};
+  state.path = path;
+  state.delimiter = delimiter;
   vector<string> blank_row;
   for (int i = 0; i < state.max_col; i++)
     blank_row.push_back("-");
@@ -125,8 +127,6 @@ int main(int argc, char **argv) {
        [](State &s, ftxui::Event e, string i) { return handle_normal(s, e, i); }},
   };
 
-  auto exit = screen.ExitLoopClosure();
-
   main_component = CatchEvent(main_component, [&](Event event) {
     auto key = event.character();
     if (isdigit(key[0])) {
@@ -152,9 +152,14 @@ int main(int argc, char **argv) {
     }
 
     if (auto it = handlers.find(state.mode); it != handlers.end()) {
-      return it->second(state, event, input_placeholder);
+      bool handled = it->second(state, event, input_placeholder);
+      if (state.exit) {
+        screen.Exit();
+        return true;
+      }
+      return handled;
     }
-
+    return false;
   });
-    screen.Loop(main_component);
+  screen.Loop(main_component);
 }

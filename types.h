@@ -48,6 +48,7 @@ struct State {
   bool show_popup = false;
   char delimiter;
   std::filesystem::path path;
+  bool exit = false;
 
   std::vector<std::string> create_blank_row(int max_col) {
     std::vector<std::string> blank_row;
