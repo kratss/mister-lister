@@ -25,16 +25,13 @@ void writeData(const std::filesystem::path &path, const char &delimiter,
                const std::vector<std::vector<std::string>> &data) {
   std::ofstream file;
   file.open(path);
-  std::string filestring;
-  for (std::vector<std::string> row : data) {
-    filestring.append(row[0]);
-    for (int j = 1; j < row.size() - 1; j++) {
-      filestring.push_back(delimiter);
-      filestring.append(row[j]);
+  for (const auto& row : data) {
+    for (std::size_t i = 0; i < row.size(); ++i) {
+      if (i != 0) file << delimiter;
+      file << row[i];
     }
-    filestring.push_back('\n');
+    file << '\n';
   }
-  file << filestring;
 }
 
 std::vector<std::vector<std::string>>
