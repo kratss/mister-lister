@@ -90,12 +90,8 @@ int main(int argc, char **argv) {
     });
   });
 
-  Component footer_component = Renderer([&] {
-    return text(to_string(state.motion_count) +
-                " a: add entry, e: edit cell, c: create column, C: delete "
-                "column, d: delete "
-                "row, q: save and quit, Q: quit without saving, u: undo");
-  });
+  Component footer_component = Renderer(
+      [&] { return text(to_string(state.motion_count) + state.pending_key); });
 
   Component window = Window({
       .inner = Renderer([&] { return key_bindings_text[state.key_map_int]; }),
@@ -109,10 +105,10 @@ int main(int argc, char **argv) {
   Component main_component = Container::Vertical(
       {edit_component | Maybe([&] { return state.mode == Mode::Edit; }),
        add_component | Maybe([&] { return state.mode == Mode::Add; }),
-       footer_component | Maybe([&] {
-         return state.mode != Mode::Add && state.mode != Mode::Edit;
-       }),
-       table_component | flex});
+       table_component | flex, footer_component | Maybe([&] {
+                                 return state.mode != Mode::Add &&
+                                        state.mode != Mode::Edit;
+                               })});
 
   main_component |= Modal(window, &state.show_popup);
 
@@ -123,15 +119,14 @@ int main(int argc, char **argv) {
        [](State &s, ftxui::Event e, string i) { return handle_edit(s, e, i); }},
       {Mode::Add,
        [](State &s, ftxui::Event e, string i) { return handle_add(s, e, i); }},
-      {Mode::Normal,
-       [](State &s, ftxui::Event e, string i) { return handle_normal(s, e, i); }},
+      {Mode::Normal, [](State &s, ftxui::Event e,
+                        string i) { return handle_normal(s, e, i); }},
   };
 
   main_component = CatchEvent(main_component, [&](Event event) {
     auto key = event.character();
     if (isdigit(key[0]) && state.mode == Mode::Normal) {
       state.motion_count = state.motion_count * 10 + (key[0] - '0');
-      state.data[0][0] = state.motion_count;
       return true;
     }
     state.pending_key += event.character();
