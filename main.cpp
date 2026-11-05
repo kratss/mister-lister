@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
        }),
        table_component | flex});
 
-  main_component |= Modal(window, &show_popup);
+  main_component |= Modal(window, &state.show_popup);
 
   using Handler = std::function<bool(State &, ftxui::Event, string)>;
 

@@ -19,12 +19,13 @@ inline const std::map<std::string, Action> key_bindings = {
     {"e", Action::edit},
     {"u", Action::undo},
     {"/", Action::search},
-    {" ", Action::show_key_map},
+    {"?", Action::show_key_map},
 
     {"q!", Action::quit_without_saving},
     {"ca", Action::column_add},
     {"cd", Action::column_delete},
     {"wq", Action::quit},
+    {"cs", Action::sort},
 
     // vim
     {"o", Action::add_entry},
