@@ -52,6 +52,7 @@ bool handle_edit(State &state, ftxui::Event &event,
     state.data[state.sel_row][state.sel_col] = state.input_buffer;
     state.mode = Mode::Normal;
     state.input_buffer.clear();
+    state.pending_key.clear();
     return true;
   } else {
     return state.input->OnEvent(event); // Let input component handle event and
@@ -71,6 +72,7 @@ bool handle_add(State &state, ftxui::Event &event,
       state.input_buffer.erase();
       return true;
     } else {
+      state.pending_key.clear();
       state.mode = Mode::Normal;
       return true;
     }
