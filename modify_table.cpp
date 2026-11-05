@@ -44,7 +44,15 @@ std::vector<std::vector<std::string>> column_sort(const State &state) {
 }
 
 Table designTable(const State &state) {
-  Table table = Table(state.data);
+  std::vector<std::vector<std::string>> visible_data;
+  visible_data.reserve(state.visible_rows.size());
+
+  for (int index : state.visible_rows){
+    visible_data.push_back(state.data.at(index));
+  }
+
+  
+  Table table = Table(visible_data);
   auto focused_cell = table.SelectCell(state.sel_col, state.sel_row);
   auto focused_row = table.SelectRow(state.sel_row);
   auto all_cells = table.SelectAll();

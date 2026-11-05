@@ -4,6 +4,7 @@
 #include <ftxui/component/component_base.hpp>
 #include <string>
 #include <vector>
+#include <ranges>
 
 enum class Mode { Normal, Add, Edit, Search, Column_Add, Key_Map, Sort };
 
@@ -49,6 +50,7 @@ struct State {
   bool show_popup = false;
   char delimiter;
   std::filesystem::path path;
+  std::vector<int> visible_rows = std::ranges::to<std::vector<int>>(std::views::iota(0, static_cast<int>(data.size())));
   bool exit = false;
 
   std::vector<std::string> create_blank_row(int max_col) {
