@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-enum class Mode { Normal, Add, Edit, Search, Column_Add, Key_Map };
+enum class Mode { Normal, Add, Edit, Search, Column_Add, Key_Map, Sort };
 
 enum class Action {
   move_up,
@@ -24,6 +24,7 @@ enum class Action {
   remove,
   search,
   show_key_map,
+  sort,
   undo,
 };
 

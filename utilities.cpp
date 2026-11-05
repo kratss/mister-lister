@@ -80,6 +80,7 @@ bool handle_add(State &state, ftxui::Event &event,
   return state.input->OnEvent(event);
 }
 
+
 bool handle_normal(State &state, ftxui::Event &event,
                    std::string &input_placeholder) {
 
@@ -201,6 +202,12 @@ bool handle_normal(State &state, ftxui::Event &event,
       state.show_popup = false;
     else
       state.show_popup = true;
+    return true;
+
+  case Action::sort:
+    state.data_history.push_back(state.data);
+    state.undo_pos++;
+    state.data = column_sort(state);
     return true;
 
   case Action::quit:

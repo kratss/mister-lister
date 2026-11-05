@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
 
   main_component = CatchEvent(main_component, [&](Event event) {
     auto key = event.character();
-    if (isdigit(key[0])) {
+    if (isdigit(key[0]) && state.mode == Mode::Normal) {
       state.motion_count = state.motion_count * 10 + (key[0] - '0');
       state.data[0][0] = state.motion_count;
       return true;

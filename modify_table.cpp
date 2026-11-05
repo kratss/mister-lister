@@ -3,6 +3,7 @@
 #include <cctype>    // for std::tolowerusing namespace ftxui;
 #include <ftxui/dom/table.hpp>
 #include <ranges>
+#include <string>
 
 using namespace ftxui;
 
@@ -27,6 +28,19 @@ State column_delete(const State &state) {
     new_state.data[i].erase(new_state.data[i].begin() + state.sel_col);
   }
   return new_state;
+}
+
+std::vector<std::vector<std::string>> column_sort(const State &state) {
+  auto sorted = state.data;
+  const int column = state.sel_col;
+
+  if (sorted.size() > 1) {
+    std::stable_sort(sorted.begin() + 1, sorted.end(),
+              [column](const auto &a, const auto &b) {
+                return a[column] < b[column];
+              });
+  }
+  return sorted;
 }
 
 Table designTable(const State &state) {
