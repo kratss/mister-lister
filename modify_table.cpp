@@ -45,6 +45,7 @@ Table designTable(const State &state) {
   });
 
   focused_cell.Decorate(bgcolor(Color::Magenta));
+  focused_cell.Decorate(focus);
   focused_row.Decorate(bgcolor(Color::Yellow));
   focused_row.Decorate(color(Color::Black));
   header_cells.Decorate(bold);
