@@ -14,3 +14,5 @@ State column_delete(const State &state);
 std::vector<std::vector<std::string>> column_sort(const State &state);
 
 ftxui::Table designTable(const State &state);
+
+State search(const State &state);

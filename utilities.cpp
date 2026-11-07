@@ -80,6 +80,18 @@ bool handle_add(State &state, ftxui::Event &event,
   return state.input->OnEvent(event);
 }
 
+bool handle_search(State &state, ftxui::Event &event,
+                 std::string &input_placeholder) {
+  if (event == Event::Return) {
+    state = search(state);
+    state.mode = Mode::Normal;
+    state.pending_key.clear();
+    return true;
+  } else {
+    return state.input->OnEvent(event); // Let input component handle event and
+                                        // indicate T/F whether it handled it
+  }
+}
 
 bool handle_normal(State &state, ftxui::Event &event,
                    std::string &input_placeholder) {
@@ -195,6 +207,11 @@ bool handle_normal(State &state, ftxui::Event &event,
     for (int i = 0; i < state.motion_count; i++)
       state.data.erase(state.data.begin() + state.sel_row);
     state.motion_count = 0;
+    return true;
+
+  case Action::search:
+    state.mode = Mode::Search;
+    state.input_buffer.clear();
     return true;
 
   case Action::show_key_map:

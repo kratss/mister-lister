@@ -82,6 +82,14 @@ int main(int argc, char **argv) {
     return edit_element;
   });
 
+  Component search_component = Renderer([&] {
+    Element search_element = hbox({
+        text("Search: "),
+        state.input->Render() | flex,
+    });
+    return search_element;
+  });
+
   Component add_component = Renderer([&] {
     return hbox({
         text("Add: "),
@@ -105,6 +113,7 @@ int main(int argc, char **argv) {
   Component main_component = Container::Vertical(
       {edit_component | Maybe([&] { return state.mode == Mode::Edit; }),
        add_component | Maybe([&] { return state.mode == Mode::Add; }),
+       search_component | Maybe([&] { return state.mode == Mode::Search; }),
        table_component | flex, footer_component | Maybe([&] {
                                  return state.mode != Mode::Add &&
                                         state.mode != Mode::Edit;
@@ -121,6 +130,8 @@ int main(int argc, char **argv) {
        [](State &s, ftxui::Event e, string i) { return handle_add(s, e, i); }},
       {Mode::Normal, [](State &s, ftxui::Event e,
                         string i) { return handle_normal(s, e, i); }},
+      {Mode::Search, [](State &s, ftxui::Event e,
+                        string i) { return handle_search(s, e, i); }},
   };
 
   main_component = CatchEvent(main_component, [&](Event event) {
@@ -135,6 +146,7 @@ int main(int argc, char **argv) {
       state.mode = Mode::Normal;
       state.pending_key.clear();
       state.motion_count = 0;
+      state.visible_rows = std::ranges::to<std::vector<int>>(std::views::iota(0, static_cast<int>(state.data.size())));
       return true;
     }
 
